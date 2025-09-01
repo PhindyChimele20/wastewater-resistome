@@ -2,26 +2,26 @@ questions:
   - id: q1
     stage: quality_control
     text: |
-      How many total sequences were flagged for being poor quality?
-    answer_type: numeric_percent
+      how did the total sequence change after trimming bases with quality &lt; Q30
+    answer_type: string_exact
   - id: q2
-    stage: alignment
+    stage: Dereplicate_sequences
     text: |
-      What is the total number of reads with quality score less than 20?
-    answer_type: integer_exact
-  - id: q3
-    stage: alignment
-    text: |
-      What percent of reads uniquely map to the reference genome?
+      what percentage of sequences occur only once (singleton)?
     answer_type: numeric_percent
+  - id: q3
+    stage: chimera_filtering
+    text: |
+      how many chimeras were found?
+    answer_type: integer_exact
     tolerance: 0.75
   - id: q4
-    stage: variant_calling
+    stage: Operational_Taxonomic_Unit
     text: |
-      How many total variants were found?
+      Which OTU had the third-highest value assigned to it?
     answer_type: integer_exact
   - id: q5
-    stage: variant_calling
+    stage: Operational_Taxonomic_Unit
     text: |
-      How many variant sites have at least 1 alternate allele call?
+      What is the value of the third-highest OTU?
     answer_type: integer_exact
