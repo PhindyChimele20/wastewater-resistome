@@ -2,7 +2,7 @@
 
 ## 1. Data sources
 
-This task is based on on publicly available sequencing data from the study "Metagenomic insights into the wastewater resistome before and after purification at large‐scale wastewater treatment plants in the Moscow city" which performed a metagenomic analysis of the raw wastewater, activated sludge and treated wastewater from two large WWTPs responsible for the treatment of urban wastewater in Moscow, Russia. Metagenomic DNA was sequenced using the Illumina HiSeq2500 platform. 
+This task is based on on publicly available sequencing data from the study "Metagenomic insights into the wastewater resistome before and after purification at large‐scale wastewater treatment plants in the Moscow city" which performed a metagenomic analysis of the raw wastewater, activated sludge and treated wastewater from two large WWTPs responsible for the treatment of urban wastewater in Moscow, Russia. Metagenomic DNA was sequenced using the Illumina HiSeq2500 platform. For this workflow we selected 1 metagenomic sample.
 
 ---
 
@@ -12,35 +12,17 @@ The raw data for this project is available in the NCBI Sequence Read Archive (SR
 ### Code for downloading
 
 ```bash
-geofetch -i GSE296035 --just-metadata
-SRRS=("SRR25007833")
+#getting paired-end reads from NCBI
+sratoolkit.3.2.1-win64\bin\fasterq-dump --split-files SRR23892276
+#####################
 
-for SRR in "${SRRS[@]}"; do
-    echo "Downloading $SRR ..."
-    prefetch "$SRR"
-    fastq-dump --gzip --split-files "$SRR"
-done
+#Pairwise overlapping reads were merged using FLASH v.1.2.11
+module load flash-1.2.11
+flash SRR23892276_1.fastq  SRR23892276_2.fastq -o SRR23892276
 ```
 
 
----
-
-## 3. Pre-processing 
-
-From the GEO where the raw data fastq files are, we selected 3 samples and downloaded using their SRR accessions as per above script (Code for Downloaded)
-
-1. **STEP 1** ...
-
-Example:
-
-```bash
-CODE TO SUBSAMPLE
-```
-
-
----
-
-## 4. How the workflow works
+## 3. How the workflow works
 The workflow files is stored in workflow/ and it is divided into different steps:
 The workflow files are stored in `workflow/`.
 
@@ -56,10 +38,7 @@ The workflow files are stored in `workflow/`.
 
 ```bash
 module load fastqc-0.11.7
-WKD="/data/Microbial_Genomics_PGRG5"
-cd $WKD
-
-fastqc -o "/data/Microbial_Genomics_PGRG5" PGRG5_R1.fq.1 PGRG5_R2.fq.1                                          
+fastqc SRR23892276.extendedFrags.fastq                                        
 
 ```
 
@@ -67,97 +46,55 @@ fastqc -o "/data/Microbial_Genomics_PGRG5" PGRG5_R1.fq.1 PGRG5_R2.fq.1
 
 ### Step 2 - Reads Cleaning/Trimming
 
-**Purpose:** Process reads to get clean, high-quality reads
-**Tools:** 'Trimmomatic'
-**Inputs:** fastq.gz files
-**Outputs:** trimmed fastq.gz files
+**Purpose:** trimming bases with quality < Q30
+**Tools:** 'sickle'
+**Inputs:** fastq files
+**Outputs:** trimmed fastq files
 **Command:**
 
 ```bash
-#Run Trimmomatic on paired-end reads
-java -jar $TRIMMOMATIC \
-PE -phred33 -validatePairs PGRG5_R1.fq.1 PGRG5_R2.fq.1 PGRG5_R1.trim.fq.1  PGRG5_R1.unpaired.fq.1 PGRG5_R2.trim.fq.1 PGRG5_R2.unpaired.fq.1 LEADING:25 TRAILING:25 SLIDINGWINDOW:4:20 MINLEN:100
+module load sickle
+sickle se -f SRR23892276.extendedFrags.fastq -t sanger -o SRR23892276_merged_trimmed.fastq -q 30
 
 ```
 ---
 
-### Step 3 – Mapping
+### Step 3 – Dereplicate sequences
 
-**Purpose:** the pipeline maps the reads to the reference genome
-**Tools:** 'BWA'
-**Inputs:** count matrix
-**Outputs:** Normalized expression values (CPM), Log2 fold-changes (manual + statistical), differential expression test results ('fit2')
+**Purpose:** Sequences clustering into operational taxonomic units
+**Tools:** 'usearch'
+**Inputs:** trimmed fastq file
+**Outputs:** uniques.fa
 **Command:**
 ```bash
-bwa mem -t 16 Reference.fna PGRG5_R1.trim.fq.1 PGRG5_R2.trim.fq.1 > Mapped.sam
+module load usearch
+usearch -fastx_uniques SRR23892276_merged_trimmed.fastq -fastaout uniques.fa -sizeout
 
 ```
-### Step 4 - BAM TO SAM AND SORTING
+### Step 4 - Chimera filtering
 
-**Purpose:** This part of the workflow converts the .sam file to .bam file the sorts it and index the bam file
-**Tools:** 'Samtools'
+**Purpose:** OTU clustering at 97% identity and removal of singletons
+**Tools:** 'usearch'
 **Inputs:** .sam file
 **Outputs:** .bam file, .bam.bai file
 **Command:**
 
 ```bash
-samtools view -b Mapped.sam > Mapped.bam
-samtools sort -@ 4 -o Mapped.sorted.bam Mapped.bam
-samtools index Mapped.sorted.bam
+usearch -cluster_otus uniques.fa -otus otus.fa -relabel OTU
 
 
 ```
 ---
-### Step 5 - Generate Consensus
+### Step 5 - Calculate abundance
 
-**Purpose:** This part of the workflow takes the mapped sorted bam file and generate a gap consensus genome
-**Tools:** 'samtools'
-**Inputs:** bam file
-**Outputs:** .fa file
+**Purpose:** Map reads back to OTUs to calculate abundance table
+**Tools:** 'usearch'
+**Inputs:** trimmed fastq file
+**Outputs:** otus.fa file, .txt file
 **Command:**
 
 ```bash
-samtools consensus -f fasta -o consensus.fa Mapped.sorted.bam
-
-```
----
-
-### Step 6 - Variant Calling
-
-**Purpose:** This part of the workflow uses bcftools to identify SNPs and Indels from the sorted bam file of the mapping, index the generated vcf file with snps then filter the snps.The variants 
-are then annotated using bedtools
-**Tools:** 'bcftools', 'bedtools'
-**Inputs:** sorted bam file
-**Outputs:** .vcf.gz file
-**Command:**
-
-```bash
-REFERENCE="Reference.fna"
-BAM="Mapped.sorted.bam"
-#variant calling
-bcftools mpileup -f $REFERENCE $BAM | bcftools call --ploidy 1 -mv -Oz -o variants.vcf.gz 
-
-bcftools index variants.vcf.gz
-
-bcftools filter -i 'AF>0.25' variants.vcf.gz -Oz -o filtered_variants.vcf.gz
-#Variant annotation
-bcftools query -f '%CHROM\t%POS0\t%POS\t%ID\n' filtered_variants.vcf.gz > variants.bed
-bedtools intersect -a variants.bed -b features.bed -wa -wb > annotated_variants.txt
-
-```
----
-### Step 7 - De-novo assembly
-
-**Purpose:** This part of the workflow makes a de novo assembly using spaded and then prokka is used for contig annotation
-**Tools:** 'Spades', 'Prokka'
-**Inputs:** .fq file
-**Outputs:** .fasta
-**Command:**
-
-```bash
-spades.py -1 PGRG5_R1.fq -2 PGRG5_R2.fq --isolate -o spades_output -t 4
-
-prokka spades_output/contigs.fasta --outdir prokka_output --prefix PGRG5
+usearch -usearch_global SRR23892276_merged_trimmed.fastq -db otus.fa -id 0.97 -strand both -otutabout otu_table.txt
 
 
 ```
