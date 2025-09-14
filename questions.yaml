@@ -2,7 +2,7 @@ questions:
   - id: q1
     stage: quality_control
     text: |
-      how did the total sequence change after trimming bases with quality &lt; Q30
+      how much (in percent) does the total bases decrease by after trimming bases with quality Q30?
     answer_type: string_exact
   - id: q2
     stage: Dereplicate_sequences
