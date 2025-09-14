@@ -3,7 +3,7 @@ questions:
     stage: quality_control
     text: |
       how much (in percent) does the total bases decrease by after trimming bases with quality Q30?
-    answer_type: string_exact
+    answer_type: numeric_percent
   - id: q2
     stage: Dereplicate_sequences
     text: |
