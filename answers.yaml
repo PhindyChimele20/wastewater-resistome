@@ -1,6 +1,6 @@
 answers:
-  q1: 2
-  q2: 99.4
-  q3: 0
-  q4: 3
-  q5: 128
+  q1: 2 (5% tolerance)
+  q2: 99.4 [95 - 99.8]
+  q3: 0 (5% tolerance)
+  q4: 3 (5% tolerance)
+  q5: 128 [120 -130]
