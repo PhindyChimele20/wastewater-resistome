@@ -4,6 +4,7 @@ questions:
     text: |
       how much (in percent) does the total bases decrease by after trimming bases with quality Q30?
     answer_type: numeric_percent
+    tolerance:0.5
   - id: q2
     stage: Dereplicate_sequences
     text: |
@@ -25,3 +26,4 @@ questions:
     text: |
       What is the value of the third-highest OTU?
     answer_type: integer_exact
+    tolerance:0.5
